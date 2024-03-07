@@ -20,7 +20,7 @@ class datastream:   # need to refactor into multiple classes in the future
         #self.axis_increment = 0.01    # 1% incr / decr to adjusting speed
         self.axis_values = {'gb':0.1, 'steer': 0.}   # initialize gb to a small value for later on proportional calculation
         self.axes_order = ['gb', 'steer']
-        self.csv_filepath = csv_filepath  
+        self.csv_filepath = csv_filepath
         self.control_sock = messaging.pub_sock('testJoystick')  # for sending gb value
         self.time_list = []
         self.speed_list = []
@@ -28,9 +28,9 @@ class datastream:   # need to refactor into multiple classes in the future
 
         # subscribe to get car real-time speed
         self.sm = messaging.SubMaster(['gpsLocationExternal'])
-       
+
         # start time before communicating first car speed
-        self.start_time = time.time() 
+        self.start_time = time.time()
 
         # communicate the first speed to get the car moving
         # dat = new_message('testJoystick')
@@ -50,9 +50,9 @@ class datastream:   # need to refactor into multiple classes in the future
             for row in reader:
                 data.append(row)
                 self.time_list.append(float(row['time']))
-                self.speed_list.append(float(row['speed'])) 
+                self.speed_list.append(float(row['speed']))
         return data
-    
+
     def write_data(self, filename, data_list):
         """
         Write debug info into file for future reference
@@ -68,7 +68,7 @@ class datastream:   # need to refactor into multiple classes in the future
         Return target speed based on the elapsed time
         """
         return self.interp(elapsed_time, self.time_list, self.speed_list)  # interp return type should be a float
-    
+
 
     def interp(self, x, xp, fp):
         """
@@ -97,7 +97,7 @@ class datastream:   # need to refactor into multiple classes in the future
         #print("get_actual_speed returned", gle.speed * 2.236)  # gle.speed should be m/s so convert it to mph
         # gle.speed is in m/s but the speeds in the csv file are MPH, conversion factor is 2.236
         return gle.speed * 2.236
-    
+
 
     def get_simulated_real_speed(self, target_speed):
             """
@@ -131,7 +131,7 @@ class datastream:   # need to refactor into multiple classes in the future
             g0 = 0
         t1 = elapsed_time
 
-        while True:    
+        while True:
             if elapsed_time >= end_time:   # infinitely loop
                 start_time = current_time
                 elapsed_time = 0
@@ -141,7 +141,7 @@ class datastream:   # need to refactor into multiple classes in the future
             t2 = t1 + interval  # next time (next iteration), interval is an approximation (assume calculatiosn and communication time is tiny)
             # calculate target V
             Vt2 = self.get_target_speed(t2)
-            
+
             # get current actual speed of car
             actual_speed = self.get_actual_speed()
             if actual_speed is not None:
@@ -167,8 +167,8 @@ class datastream:   # need to refactor into multiple classes in the future
                         g0 = -0.1
 
                 g1 = g0 * (t1 - t0) * (Vt2 - Vr1) / (Vr1 - Vr0) / interval
-            
-            # clip value 
+
+            # clip value
             if g1 > 1:
                 g1 = 1
             elif g1 < -1:
@@ -186,7 +186,8 @@ class datastream:   # need to refactor into multiple classes in the future
             # print("target - actual:", Vt1 - Vr1)
             # print()
 
-            # send control signals to Openpilot for gas brake
+
+            # publish to Openpilot to send over gas brake value
             dat = new_message('testJoystick')
             dat.testJoystick.axes = [self.axis_values[a] for a in self.axes_order]  # put all values in axis_values into a list
             dat.testJoystick.buttons = [False]
@@ -201,7 +202,7 @@ class datastream:   # need to refactor into multiple classes in the future
             g0 = g1
             t0 = t1
             Vr0 = Vr1
-    
+
             t1 = elapsed_time
             #print("current time:", t1, "current speed:", Vr1, "next target speed:", Vt2)
 
@@ -213,7 +214,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--csv_file', help='CSV file containing time (s) and speed (mph)')
     args = parser.parse_args()# subscribe to get real-time info from openpilot
-    
+
 
     if not Params().get_bool("IsOffroad") and "ZMQ" not in os.environ:
         print("The car must be off before running datastream.")
@@ -221,6 +222,6 @@ if __name__ == '__main__':
 
     # create the data stream object
     ds = datastream(csv_filepath = args.csv_file)
-    
+
     while True:
         ds.control_speed(ds.start_time)
